@@ -124,8 +124,10 @@ const USERS = {
   'angkana':  { password: 'Ang@2026',    role: 'sales',  name: 'K.Angkana',   salesman: 'K.Angkana' },
   'than':     { password: 'Than@2026',   role: 'sales',  name: 'Than',        salesman: 'Than' },
   'opthantiva': { password: '10101114',  role: 'sales',  name: 'Thantiva',    salesman: 'Thantiva' },
-  // หัวหน้ากะผลิต — เห็นเฉพาะหน้าแผนผลิต (ดูอย่างเดียว แก้ไขไม่ได้). เพิ่ม/แก้ user-password ได้ตามจำนวนกะจริง
+  // หัวหน้ากะผลิต — เห็นหน้าแผนผลิต (ดูอย่างเดียว) และหน้าสรุปเกรด/ปัญหาประจำวัน
   'shift1':   { password: 'Shift1@2026', role: 'production', name: 'หัวหน้ากะ 1', salesman: null },
+  // ผู้ลงข้อมูลเกรด — เข้าได้เฉพาะหน้า %เกรดและปัญหาประจำวัน (สิทธิ์บันทึก/แก้ไข)
+  'chen':     { password: 'chen@2026', role: 'grade_admin', name: 'ผู้ลงข้อมูลเกรด', salesman: null },
   // จัดซื้อวัตถุดิบ — เห็นเฉพาะหน้าจัดซื้อวัตถุดิบ (ดู KPI เป้า + กรอกผลจัดซื้อจริงประจำวัน)
   'purchase1': { password: 'Purchase1@2026', role: 'purchase_material', name: 'จัดซื้อวัตถุดิบ', salesman: null },
 };
@@ -203,7 +205,7 @@ function doLogin() {
     salesman: found.salesman, loginAt: new Date().toISOString(),
   }));
 
-  const target = (found.role === 'production' || found.role === 'purchase_material') ? 'production_plan.html' : 'dashboard_home.html';
+  const target = found.role === 'purchase_material' ? 'production_plan.html' : 'dashboard_home.html';
   setTimeout(()=>{ window.location.href = target; }, 300);
 }
 
@@ -211,7 +213,7 @@ const sess = sessionStorage.getItem('aaf_user');
 if(sess){
   try{
     const parsed = JSON.parse(sess);
-    window.location.href = (parsed.role === 'production' || parsed.role === 'purchase_material') ? 'production_plan.html' : 'dashboard_home.html';
+    window.location.href = parsed.role === 'purchase_material' ? 'production_plan.html' : 'dashboard_home.html';
   }catch(e){
     window.location.href = 'dashboard_home.html';
   }
