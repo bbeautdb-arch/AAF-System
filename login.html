@@ -113,10 +113,12 @@
 <script>
 const LOG_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwcerDqFFb0cYXmCsIz3LX79-IF_eX4XEA5CK_vgtpXCObS8xKrBDvfLFNSSArEy8KZ/exec';
 const LOG_SECRET    = 'aaf2026secretkey';
+const GRADE_AUTH_API = 'https://aaf-grade-insight-2569.bbeautybbsoraai.chatgpt.site/api/aaf/login';
 
 const USERS = {
-  'admin':    { password: 'AAF@2026',    role: 'admin',  name: 'Admin',       salesman: null },
-  'boss':     { password: 'Boss@2026',   role: 'admin',  name: 'ผู้บริหาร',    salesman: null },
+  // บัญชีที่เข้าแดชบอร์ดเกรดตรวจรหัสผ่านที่ server และไม่เก็บรหัสไว้ใน HTML
+  'admin':    { serverAuth: true, role: 'admin',  name: 'Admin',       salesman: null },
+  'boss':     { serverAuth: true, role: 'admin',  name: 'ผู้บริหาร',    salesman: null },
   'nok':      { password: 'Nok@2026',    role: 'sales',  name: 'Nok',         salesman: 'Nok' },
   'kim':      { password: 'Kim@2026',    role: 'sales',  name: 'Kim',         salesman: 'Kim' },
   'lek':      { password: 'Lek@2026',    role: 'sales',  name: 'Lek',         salesman: 'Lek' },
@@ -125,9 +127,9 @@ const USERS = {
   'than':     { password: 'Than@2026',   role: 'sales',  name: 'Than',        salesman: 'Than' },
   'opthantiva': { password: '10101114',  role: 'sales',  name: 'Thantiva',    salesman: 'Thantiva' },
   // หัวหน้ากะผลิต — เห็นหน้าแผนผลิต (ดูอย่างเดียว) และหน้าสรุปเกรด/ปัญหาประจำวัน
-  'shift1':   { password: 'Shift1@2026', role: 'production', name: 'หัวหน้ากะ 1', salesman: null },
+  'shift1':   { serverAuth: true, role: 'production', name: 'หัวหน้ากะ 1', salesman: null },
   // ผู้ลงข้อมูลเกรด — เข้าได้เฉพาะหน้า %เกรดและปัญหาประจำวัน (สิทธิ์บันทึก/แก้ไข)
-  'chen':     { password: 'chen@2026', role: 'grade_admin', name: 'ผู้ลงข้อมูลเกรด', salesman: null },
+  'chen':     { serverAuth: true, role: 'grade_admin', name: 'ผู้ลงข้อมูลเกรด', salesman: null },
   // จัดซื้อวัตถุดิบ — เห็นเฉพาะหน้าจัดซื้อวัตถุดิบ (ดู KPI เป้า + กรอกผลจัดซื้อจริงประจำวัน)
   'purchase1': { password: 'Purchase1@2026', role: 'purchase_material', name: 'จัดซื้อวัตถุดิบ', salesman: null },
 };
@@ -179,18 +181,43 @@ function logAttempt(username, success, role) {
     });
 }
 
-function doLogin() {
+async function doLogin() {
   const user = document.getElementById('username').value.trim().toLowerCase();
   const pass = document.getElementById('password').value.trim();
   const errEl = document.getElementById('error-msg');
 
   if(!user || !pass) { errEl.style.display = 'block'; return; }
 
-  const found = USERS[user];
+  const configured = USERS[user];
   const btn = document.getElementById('btn-login');
   btn.disabled = true; btn.textContent = 'กำลังตรวจสอบ...';
 
-  if(!found || found.password !== pass) {
+  let found = configured;
+  let gradeBridgeSessionToken = null;
+  if (configured?.serverAuth) {
+    try {
+      const response = await fetch(GRADE_AUTH_API, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({ username: user, password: pass }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok || !result.user || !result.bridgeSessionToken) {
+        found = null;
+      } else {
+        found = result.user;
+        gradeBridgeSessionToken = result.bridgeSessionToken;
+      }
+    } catch (error) {
+      found = null;
+    }
+  } else if (!configured || configured.password !== pass) {
+    found = null;
+  }
+
+  if(!found) {
     errEl.style.display = 'block';
     document.getElementById('password').value = '';
     logAttempt(user, false, '');
@@ -203,6 +230,7 @@ function doLogin() {
   sessionStorage.setItem('aaf_user', JSON.stringify({
     username: user, name: found.name, role: found.role,
     salesman: found.salesman, loginAt: new Date().toISOString(),
+    gradeBridgeSessionToken: gradeBridgeSessionToken,
   }));
 
   const target = found.role === 'purchase_material' ? 'production_plan.html' : 'dashboard_home.html';
